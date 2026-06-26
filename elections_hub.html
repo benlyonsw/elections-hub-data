@@ -15,6 +15,7 @@
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     
     <style>
         html, body { 
@@ -47,6 +48,10 @@
         .leaflet-popup-content li { font-size: 12px; margin-bottom: 4px; }
         .leaflet-popup-content a { color: #2563eb; text-decoration: underline; }
         .leaflet-popup-content a:hover { color: #1d4ed8; }
+        
+        /* Address search result list styling */
+        .district-result-list { list-style-type: disc; padding-left: 20px; font-size: 13px; margin-top: 5px; }
+        .district-result-list li { margin-bottom: 3px; }
     </style>
 </head>
 <body class="bg-gray-100 font-sans overflow-y-auto md:overflow-hidden">
@@ -55,7 +60,7 @@
         <aside class="w-full bg-white h-auto md:h-full shadow-lg flex flex-col z-[1001] overflow-y-auto border-r border-gray-200">
             <div class="p-6 border-b border-gray-200">
                 <h1 class="text-xl font-bold text-gray-800">Welcome to the Pro-Housing Pittsburgh Elections Hub!</h1>
-                <p class="text-sm text-gray-500 mt-1">Here you can check out our endorsements, explore candidate Q&As, and easily access voter resources. This page is continually updated, so keep an eye out for new uploads as the midterms approach!</p>
+                <p class="text-sm text-gray-500 mt-1">Here you can check out our endorsements, look up your voting information, and easily access voter resources. This page is continually updated, so keep an eye out for new uploads as the midterms approach!</p>
             </div>
 
             <div class="p-6 flex-1 space-y-6">
@@ -76,6 +81,20 @@
                         <option value="county-executive">County Executive - General</option>
                         <option value="county-council">County Council - General</option>
                     </select>
+                </div>
+
+                <hr class="border-gray-200">
+
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Voter Information Lookup (Allegheny County Only)</label>
+                    <p class="text-xs text-gray-500 mb-3">Enter your address to look up your voting districts!</p>
+                    
+                    <div class="flex space-x-2 mb-3">
+                        <input type="text" id="address-input" placeholder="e.g. 436 Grant St, Pittsburgh" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                        <button onclick="lookupAddress()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer shadow-sm">Search</button>
+                    </div>
+                    
+                    <div id="lookup-loader" class="text-xs text-blue-600 hidden mb-2 font-medium animate-pulse">Locating address and intersecting layers...</div>
                 </div>
 
                 <hr class="border-gray-200">
@@ -129,7 +148,7 @@
         let countyBoundaryLayer = null;
         let countyCouncilLayer = null;
 
-        // Re-mapped GitHub endpoints
+        // GitHub endpoints
         const pghCouncilDistrictsUrl = "https://raw.githubusercontent.com/benlyonsw/elections-hub-data/main/2022_Pittsburgh_Council_Districts.geojson";
         const pghMunicipalBoundaryUrl = "https://raw.githubusercontent.com/benlyonsw/elections-hub-data/main/Pittsburgh_Boundary.geojson";
         const paHouseDistrictsUrl = "https://raw.githubusercontent.com/benlyonsw/elections-hub-data/main/PaHouse2024_03.geojson";
@@ -137,8 +156,34 @@
         const countyBoundaryUrl = "https://raw.githubusercontent.com/benlyonsw/elections-hub-data/main/allegheny_county_boundary.geojson";
         const countyCouncilDistrictsUrl = "https://raw.githubusercontent.com/benlyonsw/elections-hub-data/main/allegheny_council_districts.geojson";
 
-        // Style parameters matching the State House Special tab schema (overlayStyle) 
-        // updated to use this consistently for City Council as well
+        // Lookup Endpoints for Address Search Tool
+        const lookupEndpoints = {
+            votingDistrict: "https://raw.githubusercontent.com/benlyonsw/elections-hub-data/main/allegheny_county_election_districts.geojson",
+            cityCouncil: "https://raw.githubusercontent.com/benlyonsw/elections-hub-data/main/2022_Pittsburgh_Council_Districts.geojson",
+            countyCouncil: "https://raw.githubusercontent.com/benlyonsw/elections-hub-data/main/allegheny_council_districts.geojson",
+            stateHouse: "https://raw.githubusercontent.com/benlyonsw/elections-hub-data/main/PaHouse2024_03.geojson",
+            stateSenate: "https://raw.githubusercontent.com/benlyonsw/elections-hub-data/main/allegheny_county_senate_districts.geojson",
+            congressional: "https://raw.githubusercontent.com/benlyonsw/elections-hub-data/main/allegheny_county_congressional_districts.geojson"
+        };
+
+        // Cache for preloaded lookup GeoJSON features
+        let cachedGeoJson = {};
+        let addressSearchMarker = null;
+        let addressHighlightLayer = null;
+
+        // Preload geometries for the address lookup module
+        function preloadLookupGeometries() {
+            Object.keys(lookupEndpoints).forEach(key => {
+                fetch(lookupEndpoints[key])
+                    .then(res => res.json())
+                    .then(geoJsonData => {
+                        cachedGeoJson[key] = geoJsonData;
+                    })
+                    .catch(err => console.error(`Failed to preload ${key} geometries:`, err));
+            });
+        }
+        preloadLookupGeometries();
+
         const overlayStyle = { color: "#1e4ed8", weight: 3, fillColor: "#3b82f6", fillOpacity: 0.2, interactive: true };
 
         window.setYear = function(year) {
@@ -190,6 +235,163 @@
             if (specialHouseDistrictsLayer) { map.removeLayer(specialHouseDistrictsLayer); specialHouseDistrictsLayer = null; }
             if (countyBoundaryLayer) { map.removeLayer(countyBoundaryLayer); countyBoundaryLayer = null; }
             if (countyCouncilLayer) { map.removeLayer(countyCouncilLayer); countyCouncilLayer = null; }
+            if (addressSearchMarker) { map.removeLayer(addressSearchMarker); addressSearchMarker = null; }
+            if (addressHighlightLayer) { map.removeLayer(addressHighlightLayer); addressHighlightLayer = null; }
+        }
+
+        // ADDRESS LOOKUP ENGINE USING TURF.JS & NOMINATIM
+        function lookupAddress() {
+            const addressVal = document.getElementById('address-input').value;
+            if(!addressVal) {
+                alert("Please enter an address first.");
+                return;
+            }
+            
+            const loader = document.getElementById('lookup-loader');
+            loader.classList.remove('hidden');
+
+            // Force local scope lookup by appending locational qualifiers, requesting detailed address tags
+            const query = encodeURIComponent(addressVal + ", Allegheny County, PA");
+            
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${query}`)
+                .then(res => res.json())
+                .then(geoData => {
+                    loader.classList.add('hidden');
+                    if(geoData.length === 0) {
+                        alert("Address not found. Try adding city or postal zip.");
+                        return;
+                    }
+                    
+                    // Clear the map layers when an address is successfully looked up
+                    clearLayers();
+                    
+                    const lat = parseFloat(geoData[0].lat);
+                    const lon = parseFloat(geoData[0].lon);
+                    
+                    // Directly pull structured property items
+                    const addrDetails = geoData[0].address || {};
+                    const houseNumber = addrDetails.house_number || "";
+                    const road = addrDetails.road || "";
+                    
+                    // Combine into Street Number + Street Name line item
+                    const streetDisplay = (houseNumber || road) ? `${houseNumber} ${road}`.trim() : (addrDetails.pedestrian || addrDetails.suburb || "Address Details");
+                    
+                    // Extract local municipality, stripping out localized unincorporated hamlets/suburbs (e.g. Mount Nebo)
+                    let municipalityDisplay = addrDetails.city || addrDetails.town || addrDetails.borough || "";
+                    if (!municipalityDisplay || addrDetails.suburb) {
+                        const fullDisplayName = geoData[0].display_name || "";
+                        if (fullDisplayName.toLowerCase().includes("township")) {
+                            const parts = fullDisplayName.split(',');
+                            const townshipPart = parts.find(p => p.toLowerCase().includes("township"));
+                            if (townshipPart) {
+                                municipalityDisplay = townshipPart.trim();
+                            } else {
+                                municipalityDisplay = addrDetails.municipality || addrDetails.village || addrDetails.suburb || "";
+                            }
+                        } else {
+                            municipalityDisplay = addrDetails.municipality || addrDetails.village || addrDetails.suburb || "";
+                        }
+                    }
+
+                    // Run Turf Point in Polygon evaluation checks
+                    const pt = turf.point([lon, lat]);
+                    
+                    let vDistrict = "Not matched";
+                    let cCouncil = "N/A";
+                    let coCouncil = "Outside Allegheny County limits";
+                    let stHouse = "Not matched";
+                    let stSenate = "Not matched";
+                    let congDist = "Not matched";
+                    
+                    // 1. Voting District Evaluation via Muni_War_1
+                    if(cachedGeoJson.votingDistrict) {
+                        for(let f of cachedGeoJson.votingDistrict.features) {
+                            if(turf.booleanPointInPolygon(pt, f)) {
+                                vDistrict = f.properties.Muni_War_1 || f.properties.elect_dist || f.properties.WARD_PREC || f.properties.PRECINCT || f.properties.name || f.properties.NAME || "Identified";
+                                break;
+                            }
+                        }
+                    }
+
+                    // 2. City Council District Evaluation
+                    if(cachedGeoJson.cityCouncil) {
+                        for(let f of cachedGeoJson.cityCouncil.features) {
+                            if(turf.booleanPointInPolygon(pt, f)) {
+                                cCouncil = f.properties.DIST_ID || f.properties.district || f.properties.District || "Identified";
+                                break;
+                            }
+                        }
+                    }
+
+                    // 3. County Council District Evaluation
+                    if(cachedGeoJson.countyCouncil) {
+                        for(let f of cachedGeoJson.countyCouncil.features) {
+                            if(turf.booleanPointInPolygon(pt, f)) {
+                                coCouncil = f.properties.district || f.properties.District || f.properties.DISTRICT || "Identified";
+                                break;
+                            }
+                        }
+                    }
+
+                    // 4. State House District Evaluation
+                    if(cachedGeoJson.stateHouse) {
+                        for(let f of cachedGeoJson.stateHouse.features) {
+                            if(turf.booleanPointInPolygon(pt, f)) {
+                                stHouse = f.properties.LEG_DISTRI || f.properties.District || f.properties.DISTRICT || "Identified";
+                                break;
+                            }
+                        }
+                    }
+
+                    // 5. State Senate District Evaluation targeting LEG_DISTRI
+                    if(cachedGeoJson.stateSenate) {
+                        for(let f of cachedGeoJson.stateSenate.features) {
+                            if(turf.booleanPointInPolygon(pt, f)) {
+                                stSenate = f.properties.LEG_DISTRI || f.properties.SEN_DISTRI || f.properties.ST_SENATE || f.properties.SENDIST || f.properties.DISTRICT || "Identified";
+                                break;
+                            }
+                        }
+                    }
+
+                    // 6. Congressional District Evaluation
+                    if(cachedGeoJson.congressional) {
+                        for(let f of cachedGeoJson.congressional.features) {
+                            if(turf.booleanPointInPolygon(pt, f)) {
+                                congDist = f.properties.US_CONGRE || f.properties.District || f.properties.DISTRICT || "Identified";
+                                break;
+                            }
+                        }
+                    }
+
+                    // Center map on coordinates
+                    map.setView([lat, lon], 15);
+
+                    // Set detailed address popup with [Street Number] [Street Name] on one line and [Municipality] below
+                    const popupContent = `
+                       <div style="font-size: 15px; line-height: 1.4;">
+                           <b>Your Voting Information</b><br>
+                           <p style="font-size: 16px; font-weight: 600; margin-top: 4px; margin-bottom: 0px;">${streetDisplay}</p>
+                           <p style="font-size: 16px; font-weight: 600; margin-top: 0px; margin-bottom: 8px;">${municipalityDisplay}</p>
+                           <span class="font-bold text-indigo-800 block border-b border-gray-100 pb-1 mb-1">Electoral Districts:</span>
+                           <ul class="district-result-list" style="padding-left: 15px; margin-top: 0px;">
+                               <li><b>Voting District:</b> ${vDistrict}</li>
+                               <li><b>City Council District:</b> ${cCouncil}</li>
+                               <li><b>County Council District:</b> ${coCouncil}</li>
+                               <li><b>State House District:</b> ${stHouse}</li>
+                               <li><b>State Senate District:</b> ${stSenate}</li>
+                               <li><b>Congressional District:</b> ${congDist}</li>
+                           </ul>
+                       </div>
+                    `;
+
+                    addressSearchMarker = L.marker([lat, lon]).addTo(map)
+                        .bindPopup(popupContent, { maxWidth: 280 })
+                        .openPopup();
+                    
+                }).catch(err => {
+                    loader.classList.add('hidden');
+                    console.error("Geocoding lookup error encountered:", err);
+                });
         }
 
         function loadMapLayers() {
