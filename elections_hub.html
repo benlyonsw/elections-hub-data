@@ -213,9 +213,9 @@
                                             
                                             let mayorHtml = '';
                                             if (currentElectionType === 'mayoral-primary') {
-                                                mayorHtml = `<b>Mayoral Candidates</b><ul><li><strong>Corey O'Connor</strong><br><small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br><small><a href="https://www.example.com/questionnaire/corey-oconnor" target="_blank">View Candidate Questionnaire</a></small></li><li style="margin-top: 8px;"><strong>Ed Gainey</strong><br><small><a href="https://www.example.com/questionnaire/ed-gainey" target="_blank">View Candidate Questionnaire</a></small></li></ul>`;
+                                                mayorHtml = `<b>Mayoral Candidates</b><ul><li><strong>Corey O'Connor</strong><br><small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br><small><a href="https://www.prohousingpgh.org/blog/may-2025-primary-questionnaire" target="_blank">View Candidate Questionnaire</a></small></li><li style="margin-top: 8px;"><strong>Ed Gainey</strong><br><small><a href="https://docs.google.com/document/d/1hRpsTspK2Ud1yxw8ForJwMGE3SFnAr1_PdeCMIx_WWs/edit?tab=t.0" target="_blank">View Candidate Questionnaire</a></small></li></ul>`;
                                             } else {
-                                                mayorHtml = `<b>Mayoral</b><ul><li><strong>Corey O'Connor</strong><br><small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br><small><a href="https://www.example.com/questionnaire/corey-oconnor" target="_blank">View Candidate Questionnaire</a></small></li></ul>`;
+                                                mayorHtml = `<b>Mayoral</b><ul><li><strong>Corey O'Connor</strong><br><small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br><small><a href="https://www.prohousingpgh.org/blog/may-2025-primary-questionnaire" target="_blank">View Candidate Questionnaire</a></small></li></ul>`;
                                             }
                                             
                                             layer.bindPopup(`<h3>City of Pittsburgh</h3>${mayorHtml}`).openPopup();
@@ -245,7 +245,7 @@
                                             map.fitBounds(e.target.getBounds());
                                             const distId = parseInt(feature.properties.DIST_ID, 10);
                                             let name = distId === 2 ? "Kim Salinetro" : distId === 4 ? "Anthony Coghill" : "Erika Strassburger";
-                                            let link = distId === 2 ? "https://www.example.com/questionnaire/kim-salinetro" : distId === 4 ? "https://www.example.com/questionnaire/anthony-coghill" : "https://www.example.com/questionnaire/erika-strassburger";
+                                            let link = distId === 2 ? "https://www.prohousingpgh.org/blog/may-2025-primary-questionnaire" : distId === 4 ? "https://www.prohousingpgh.org/blog/may-2025-primary-questionnaire" : "https://www.prohousingpgh.org/blog/may-2025-primary-questionnaire";
                                             
                                             layer.bindPopup(`<b>City Council District ${distId}</b><ul><li><strong>${name}</strong><br><small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br><small><a href="${link}" target="_blank">View Candidate Questionnaire</a></small></li></ul>`).openPopup();
                                         }
@@ -275,7 +275,7 @@
                                         mouseout: (e) => { if (muniBoundaryLayer) muniBoundaryLayer.resetStyle(e.target); },
                                         click: (e) => {
                                             map.fitBounds(e.target.getBounds());
-                                            let controllerHtml = `<b>City Controller Candidates</b><ul><li><strong>Rachael Heisler</strong><br><small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br><small><a href="https://www.example.com/questionnaire/rachael-heisler" target="_blank">View Candidate Questionnaire</a></small></li></ul>`;
+                                            let controllerHtml = `<b>City Controller Candidates</b><ul><li><strong>Rachael Heisler</strong><br><small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br><small><a href="https://drive.google.com/file/d/1zhP9EkqDoQgbAqWZGYdsuhmtdKTQvxrn/view?usp=drive_link" target="_blank">View Candidate Questionnaire</a></small></li></ul>`;
                                             layer.bindPopup(`<h3>City of Pittsburgh</h3>${controllerHtml}`).openPopup();
                                         }
                                     });
@@ -308,13 +308,13 @@
                                             let link = "";
                                             if (distId === 1) {
                                                 name = "Bobby Wilson";
-                                                link = "https://www.example.com/questionnaire/bobby-wilson";
+                                                link = "https://drive.google.com/file/d/1ChpXyLuCh5dot9gnxNyLynLLVtVFfr0G/view?usp=drive_link";
                                             } else if (distId === 3) {
-                                                name = "Bruce Kraus";
-                                                link = "https://www.example.com/questionnaire/bruce-kraus";
+                                                name = "Bob Charland";
+                                                link = "https://drive.google.com/file/d/1z1m2yLd2QhCZyKu1-O-EChl0M92cQ3z_/view?usp=drive_link";
                                             } else {
                                                 name = "Khari Mosley";
-                                                link = "https://www.example.com/questionnaire/khari-mosley";
+                                                link = "https://drive.google.com/file/d/1HCc9DrdHRsa6cGEUDfjgW9qT6p8v5i13/view?usp=drive_link";
                                             }
 
                                             layer.bindPopup(`<b>City Council District ${distId}</b><ul><li><strong>${name}</strong><br><small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br><small><a href="${link}" target="_blank">View Candidate Questionnaire</a></small></li></ul>`).openPopup();
@@ -342,7 +342,7 @@
                                         mouseout: (e) => { if (countyBoundaryLayer) countyBoundaryLayer.resetStyle(e.target); },
                                         click: (e) => {
                                             map.fitBounds(e.target.getBounds());
-                                            let execHtml = `<b>County Executive Candidates</b><ul><li><strong>Sara Innamorato</strong><br><small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br><small><a href="https://www.example.com/questionnaire/sara-innamorato" target="_blank">View Candidate Questionnaire</a></small></li><li style="margin-top: 8px;"><strong>Joe Rockey</strong><br><small><a href="https://www.example.com/questionnaire/joe-rockey" target="_blank">View Candidate Questionnaire</a></small></li></ul>`;
+                                            let execHtml = `<b>County Executive Candidates</b><ul><li><strong>Sara Innamorato</strong><br><small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br><small><a href="https://drive.google.com/file/d/1c6T_y6JtWQxejSXzxSQHO_qgUKAr1B8s/view?usp=drive_link" target="_blank">View Candidate Questionnaire</a></small></li></ul>`;
                                             layer.bindPopup(`<h3>Allegheny County</h3>${execHtml}`).openPopup();
                                         }
                                     });
@@ -381,14 +381,14 @@
 
                                             if (distId === 5) {
                                                 endorsementText = `<small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br>`;
-                                                candidateText = `<strong>Oren Spiegler</strong>`;
-                                                link = "https://www.example.com/questionnaire/county-council-d5";
+                                                candidateText = `<strong>Dan Gryzbek</strong>`;
+                                                link = "https://drive.google.com/file/d/1u9h7QixAu5xrSU6wwuYf_nUJmnt26zCD/view?usp=drive_link";
                                             } else if (distId === 10) {
-                                                candidateText = `<strong>Dewitt Walton</strong>`;
-                                                link = "https://www.example.com/questionnaire/county-council-d10";
+                                                candidateText = `<strong>Carl Redwood</strong>`;
+                                                link = "https://drive.google.com/file/d/1oHI1jREvk1IrK2I6rmvdTEQSP8-TQqp4/view?usp=drive_link";
                                             } else if (distId === 13) {
-                                                candidateText = `<strong>Michelle Naccarati-Chapkis</strong>`;
-                                                link = "https://www.example.com/questionnaire/county-council-d13";
+                                                candidateText = `<strong>Sam Schmidt</strong>`;
+                                                link = "https://drive.google.com/file/d/1C4UZsy173i_uMfhw8Txdw2sXiYQiBvHl/view?usp=drive_link";
                                             }
 
                                             layer.bindPopup(`<b>County Council District ${distId}</b><ul><li>${candidateText}<br>${endorsementText}<small><a href="${link}" target="_blank">View Candidate Questionnaire</a></small></li></ul>`).openPopup();
