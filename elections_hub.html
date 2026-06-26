@@ -1,0 +1,468 @@
+<style>
+  html, body {
+    overflow: auto !important;
+    height: auto !important;
+  }
+</style>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro-Housing Pittsburgh Elections Hub</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <style>
+        html, body { 
+            margin: 0; 
+            padding: 0; 
+            width: 100%; 
+            height: 100%;
+        }
+
+        /* Responsive Grid: Stacks vertically on mobile, locks side-by-side on desktop */
+        .app-layout {
+            display: grid;
+            grid-template-columns: 1fr;
+            width: 100%;
+            height: 100%;
+        }
+
+        @media (min-width: 768px) {
+            .app-layout {
+                grid-template-columns: 384px 1fr;
+                overflow: hidden;
+            }
+        }
+
+        /* Popup custom styling - Shared across all years/districts */
+        .leaflet-popup-content { font-family: inherit; width: 220px !important; }
+        .leaflet-popup-content h3 { font-size: 14px; font-weight: bold; margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+        .leaflet-popup-content b { font-size: 14px; display: block; margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+        .leaflet-popup-content ul { margin: 0; padding-left: 15px; }
+        .leaflet-popup-content li { font-size: 12px; margin-bottom: 4px; }
+        .leaflet-popup-content a { color: #2563eb; text-decoration: underline; }
+        .leaflet-popup-content a:hover { color: #1d4ed8; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans overflow-y-auto md:overflow-hidden">
+
+    <div class="app-layout">
+        <aside class="w-full bg-white h-auto md:h-full shadow-lg flex flex-col z-[1001] overflow-y-auto border-r border-gray-200">
+            <div class="p-6 border-b border-gray-200">
+                <h1 class="text-xl font-bold text-gray-800">Welcome to the Pro-Housing Pittsburgh Elections Hub!</h1>
+                <p class="text-sm text-gray-500 mt-1">Here you can check out our endorsements, explore candidate Q&As, and easily access voter resources. This page is continually updated, so keep an eye out for new uploads as the midterms approach!</p>
+            </div>
+
+            <div class="p-6 flex-1 space-y-6">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Election Year</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="window.setYear(2026)" id="btn-2026" class="py-2 px-4 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition cursor-pointer">2026</button>
+                        <button onclick="window.setYear(2025)" id="btn-2025" class="py-2 px-4 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition cursor-pointer">2025</button>
+                        <button onclick="window.setYear(2023)" id="btn-2023" class="py-2 px-4 bg-blue-600 text-white rounded-lg font-medium shadow-sm transition cursor-pointer">2023</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="election-type" class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Election Type</label>
+                    <select id="election-type" onchange="window.setElectionType(this.value)" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
+                        <option value="controller-general" selected>City Controller - General</option>
+                        <option value="council-general">City Council - General</option>
+                        <option value="county-executive">County Executive - General</option>
+                        <option value="county-council">County Council - General</option>
+                    </select>
+                </div>
+
+                <hr class="border-gray-200">
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3">Voter Information & Resources</label>
+                    
+                    <div class="space-y-3">
+                        <a href="https://www.palegis.us/find-my-legislator" target="_blank" class="block w-full text-center bg-gray-800 hover:bg-gray-900 text-white py-2.5 rounded-lg font-medium transition text-sm shadow-sm">
+                            Find My Legislators ↗
+                        </a>
+                        <a href="https://www.pavoterservices.pa.gov/Pages/VoterRegistrationStatus.aspx" target="_blank" class="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium transition text-sm shadow-sm">
+                            PA Voter Services (Register/Status) ↗
+                        </a>
+                        <a href="https://ballotpedia.org/Main_Page" target="_blank" class="block w-full text-center bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg font-medium transition text-sm shadow-sm">
+                            Ballotpedia Sample Ballot ↗
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <div class="w-full h-[450px] md:h-full bg-gray-50 relative z-10">
+            <div id="map-container" class="w-full h-full"></div>
+        </div>
+    </div>
+
+    <script>
+        const map = L.map('map-container').setView([40.4406, -79.9959], 10);
+
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+
+        // Ensures Leaflet recalculates dimensions gracefully
+        setTimeout(() => { 
+            map.invalidateSize(); 
+        }, 200);
+
+        // Trigger resize on window events to prevent rendering deadlocks
+        window.addEventListener('resize', () => {
+            setTimeout(() => { map.invalidateSize(); }, 100);
+        });
+
+        let currentYear = 2023;
+        let currentElectionType = 'controller-general';
+        let geoJsonLayer = null;
+        let muniBoundaryLayer = null;
+        let specialHouseDistrictsLayer = null;
+        let countyBoundaryLayer = null;
+        let countyCouncilLayer = null;
+
+        // Re-mapped GitHub endpoints
+        const pghCouncilDistrictsUrl = "https://raw.githubusercontent.com/benlyonsw/elections-hub-data/main/2022_Pittsburgh_Council_Districts.geojson";
+        const pghMunicipalBoundaryUrl = "https://raw.githubusercontent.com/benlyonsw/elections-hub-data/main/Pittsburgh_Boundary.geojson";
+        const paHouseDistrictsUrl = "https://raw.githubusercontent.com/benlyonsw/elections-hub-data/main/PaHouse2024_03.geojson";
+        
+        const countyBoundaryUrl = "https://raw.githubusercontent.com/benlyonsw/elections-hub-data/main/allegheny_county_boundary.geojson";
+        const countyCouncilDistrictsUrl = "https://raw.githubusercontent.com/benlyonsw/elections-hub-data/main/allegheny_council_districts.geojson";
+
+        // Style parameters matching the State House Special tab schema (overlayStyle) 
+        // updated to use this consistently for City Council as well
+        const overlayStyle = { color: "#1e4ed8", weight: 3, fillColor: "#3b82f6", fillOpacity: 0.2, interactive: true };
+
+        window.setYear = function(year) {
+            currentYear = year;
+            document.getElementById('btn-2026').className = year === 2026 ? 'py-2 px-4 bg-blue-600 text-white rounded-lg font-medium shadow-sm transition cursor-pointer' : 'py-2 px-4 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition cursor-pointer';
+            document.getElementById('btn-2025').className = year === 2025 ? 'py-2 px-4 bg-blue-600 text-white rounded-lg font-medium shadow-sm transition cursor-pointer' : 'py-2 px-4 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition cursor-pointer';
+            document.getElementById('btn-2023').className = year === 2023 ? 'py-2 px-4 bg-blue-600 text-white rounded-lg font-medium shadow-sm transition cursor-pointer' : 'py-2 px-4 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition cursor-pointer';
+            
+            const electionSelect = document.getElementById('election-type');
+            if (electionSelect) {
+                electionSelect.innerHTML = "";
+                if (year === 2025) {
+                    electionSelect.innerHTML = `
+                        <option value="mayoral-primary" selected>Mayoral - Primary</option>
+                        <option value="council-primary">City Council - Primary</option>
+                        <option value="mayoral-general">Mayoral - General</option>
+                        <option value="council-general">City Council - General</option>
+                    `;
+                    currentElectionType = 'mayoral-primary';
+                } else if (year === 2023) {
+                    electionSelect.innerHTML = `
+                        <option value="controller-general" selected>City Controller - General</option>
+                        <option value="council-general">City Council - General</option>
+                        <option value="county-executive">County Executive - General</option>
+                        <option value="county-council">County Council - General</option>
+                    `;
+                    currentElectionType = 'controller-general';
+                } else {
+                    electionSelect.innerHTML = `
+                        <option value="general">General Election</option>
+                        <option value="specials" selected>Special Elections</option>
+                    `;
+                    currentElectionType = 'specials';
+                }
+            }
+            loadMapLayers(); 
+        };
+
+        window.setElectionType = function(type) {
+            currentElectionType = type;
+            loadMapLayers();
+        };
+
+        loadMapLayers();
+
+        function clearLayers() {
+            if (geoJsonLayer) { map.removeLayer(geoJsonLayer); geoJsonLayer = null; }
+            if (muniBoundaryLayer) { map.removeLayer(muniBoundaryLayer); muniBoundaryLayer = null; }
+            if (specialHouseDistrictsLayer) { map.removeLayer(specialHouseDistrictsLayer); specialHouseDistrictsLayer = null; }
+            if (countyBoundaryLayer) { map.removeLayer(countyBoundaryLayer); countyBoundaryLayer = null; }
+            if (countyCouncilLayer) { map.removeLayer(countyCouncilLayer); countyCouncilLayer = null; }
+        }
+
+        function loadMapLayers() {
+            clearLayers();
+
+            if (currentYear === 2025) {
+                if (currentElectionType.startsWith('mayoral')) {
+                    fetch(pghMunicipalBoundaryUrl)
+                        .then(res => res.json())
+                        .then(muniData => {
+                            if (currentYear !== 2025 || !currentElectionType.startsWith('mayoral')) return;
+
+                            muniBoundaryLayer = L.geoJSON(muniData, {
+                                style: overlayStyle,
+                                onEachFeature: (feature, layer) => {
+                                    layer.on({
+                                        mouseover: (e) => { e.target.setStyle({ fillOpacity: 0.35, weight: 4, color: "#1d4ed8" }); },
+                                        mouseout: (e) => { if (muniBoundaryLayer) muniBoundaryLayer.resetStyle(e.target); },
+                                        click: (e) => {
+                                            map.fitBounds(e.target.getBounds());
+                                            
+                                            let mayorHtml = '';
+                                            if (currentElectionType === 'mayoral-primary') {
+                                                mayorHtml = `<b>Mayoral Candidates</b><ul><li><strong>Corey O'Connor</strong><br><small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br><small><a href="https://www.example.com/questionnaire/corey-oconnor" target="_blank">View Candidate Questionnaire</a></small></li><li style="margin-top: 8px;"><strong>Ed Gainey</strong><br><small><a href="https://www.example.com/questionnaire/ed-gainey" target="_blank">View Candidate Questionnaire</a></small></li></ul>`;
+                                            } else {
+                                                mayorHtml = `<b>Mayoral</b><ul><li><strong>Corey O'Connor</strong><br><small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br><small><a href="https://www.example.com/questionnaire/corey-oconnor" target="_blank">View Candidate Questionnaire</a></small></li></ul>`;
+                                            }
+                                            
+                                            layer.bindPopup(`<h3>City of Pittsburgh</h3>${mayorHtml}`).openPopup();
+                                        }
+                                    });
+                                }
+                            }).addTo(map);
+                            
+                            if (muniBoundaryLayer) {
+                                map.fitBounds(muniBoundaryLayer.getBounds(), { padding: [40, 40] });
+                            }
+                        }).catch(err => console.error("Error loading mayoral layers:", err));
+                } else if (currentElectionType.startsWith('council')) {
+                    fetch(pghCouncilDistrictsUrl)
+                        .then(res => res.json())
+                        .then(councilData => {
+                            if (currentYear !== 2025 || !currentElectionType.startsWith('council')) return;
+
+                            geoJsonLayer = L.geoJSON(councilData, {
+                                style: overlayStyle, // Harmonized color schema
+                                filter: (feature) => [2, 4, 8].includes(parseInt(feature.properties.DIST_ID, 10)),
+                                onEachFeature: (feature, layer) => {
+                                    layer.on({
+                                        mouseover: (e) => { e.target.setStyle({ fillOpacity: 0.35, weight: 4, color: "#1d4ed8" }); },
+                                        mouseout: (e) => { if (geoJsonLayer) geoJsonLayer.resetStyle(e.target); },
+                                        click: (e) => {
+                                            map.fitBounds(e.target.getBounds());
+                                            const distId = parseInt(feature.properties.DIST_ID, 10);
+                                            let name = distId === 2 ? "Kim Salinetro" : distId === 4 ? "Anthony Coghill" : "Erika Strassburger";
+                                            let link = distId === 2 ? "https://www.example.com/questionnaire/kim-salinetro" : distId === 4 ? "https://www.example.com/questionnaire/anthony-coghill" : "https://www.example.com/questionnaire/erika-strassburger";
+                                            
+                                            layer.bindPopup(`<b>City Council District ${distId}</b><ul><li><strong>${name}</strong><br><small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br><small><a href="${link}" target="_blank">View Candidate Questionnaire</a></small></li></ul>`).openPopup();
+                                        }
+                                    });
+                                }
+                            }).addTo(map);
+                            
+                            if (geoJsonLayer) {
+                                map.fitBounds(geoJsonLayer.getBounds(), { padding: [40, 40] });
+                            }
+                        }).catch(err => console.error("Error loading council layers:", err));
+                }
+
+            } else if (currentYear === 2023) {
+                if (currentElectionType === 'controller-general') {
+                    // City Controller General Election view (City Boundary)
+                    fetch(pghMunicipalBoundaryUrl)
+                        .then(res => res.json())
+                        .then(muniData => {
+                            if (currentYear !== 2023 || currentElectionType !== 'controller-general') return;
+
+                            muniBoundaryLayer = L.geoJSON(muniData, {
+                                style: overlayStyle,
+                                onEachFeature: (feature, layer) => {
+                                    layer.on({
+                                        mouseover: (e) => { e.target.setStyle({ fillOpacity: 0.35, weight: 4, color: "#1d4ed8" }); },
+                                        mouseout: (e) => { if (muniBoundaryLayer) muniBoundaryLayer.resetStyle(e.target); },
+                                        click: (e) => {
+                                            map.fitBounds(e.target.getBounds());
+                                            let controllerHtml = `<b>City Controller Candidates</b><ul><li><strong>Rachael Heisler</strong><br><small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br><small><a href="https://www.example.com/questionnaire/rachael-heisler" target="_blank">View Candidate Questionnaire</a></small></li></ul>`;
+                                            layer.bindPopup(`<h3>City of Pittsburgh</h3>${controllerHtml}`).openPopup();
+                                        }
+                                    });
+                                }
+                            }).addTo(map);
+                            
+                            if (muniBoundaryLayer) {
+                                map.fitBounds(muniBoundaryLayer.getBounds(), { padding: [40, 40] });
+                            }
+                        }).catch(err => console.error("Error loading controller layers:", err));
+                } else if (currentElectionType === 'council-general') {
+                    // City Council General Election view (Districts 1, 3, 9)
+                    fetch(pghCouncilDistrictsUrl)
+                        .then(res => res.json())
+                        .then(councilData => {
+                            if (currentYear !== 2023 || currentElectionType !== 'council-general') return;
+
+                            geoJsonLayer = L.geoJSON(councilData, {
+                                style: overlayStyle, // Harmonized color schema
+                                filter: (feature) => [1, 3, 9].includes(parseInt(feature.properties.DIST_ID, 10)),
+                                onEachFeature: (feature, layer) => {
+                                    layer.on({
+                                        mouseover: (e) => { e.target.setStyle({ fillOpacity: 0.35, weight: 4, color: "#1d4ed8" }); },
+                                        mouseout: (e) => { if (geoJsonLayer) geoJsonLayer.resetStyle(e.target); },
+                                        click: (e) => {
+                                            map.fitBounds(e.target.getBounds());
+                                            const distId = parseInt(feature.properties.DIST_ID, 10);
+                                            
+                                            let name = "";
+                                            let link = "";
+                                            if (distId === 1) {
+                                                name = "Bobby Wilson";
+                                                link = "https://www.example.com/questionnaire/bobby-wilson";
+                                            } else if (distId === 3) {
+                                                name = "Bruce Kraus";
+                                                link = "https://www.example.com/questionnaire/bruce-kraus";
+                                            } else {
+                                                name = "Khari Mosley";
+                                                link = "https://www.example.com/questionnaire/khari-mosley";
+                                            }
+
+                                            layer.bindPopup(`<b>City Council District ${distId}</b><ul><li><strong>${name}</strong><br><small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br><small><a href="${link}" target="_blank">View Candidate Questionnaire</a></small></li></ul>`).openPopup();
+                                        }
+                                    });
+                                }
+                            }).addTo(map);
+                            
+                            if (geoJsonLayer) {
+                                map.fitBounds(geoJsonLayer.getBounds(), { padding: [40, 40] });
+                            }
+                        }).catch(err => console.error("Error loading 2023 council layers:", err));
+                } else if (currentElectionType === 'county-executive') {
+                    // County Executive Overlay (Allegheny County Boundary Query Endpoint)
+                    fetch(countyBoundaryUrl)
+                        .then(res => res.json())
+                        .then(countyData => {
+                            if (currentYear !== 2023 || currentElectionType !== 'county-executive') return;
+
+                            countyBoundaryLayer = L.geoJSON(countyData, {
+                                style: overlayStyle,
+                                onEachFeature: (feature, layer) => {
+                                    layer.on({
+                                        mouseover: (e) => { e.target.setStyle({ fillOpacity: 0.35, weight: 4, color: "#1d4ed8" }); },
+                                        mouseout: (e) => { if (countyBoundaryLayer) countyBoundaryLayer.resetStyle(e.target); },
+                                        click: (e) => {
+                                            map.fitBounds(e.target.getBounds());
+                                            let execHtml = `<b>County Executive Candidates</b><ul><li><strong>Sara Innamorato</strong><br><small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br><small><a href="https://www.example.com/questionnaire/sara-innamorato" target="_blank">View Candidate Questionnaire</a></small></li><li style="margin-top: 8px;"><strong>Joe Rockey</strong><br><small><a href="https://www.example.com/questionnaire/joe-rockey" target="_blank">View Candidate Questionnaire</a></small></li></ul>`;
+                                            layer.bindPopup(`<h3>Allegheny County</h3>${execHtml}`).openPopup();
+                                        }
+                                    });
+                                }
+                            }).addTo(map);
+
+                            if (countyBoundaryLayer) {
+                                map.fitBounds(countyBoundaryLayer.getBounds(), { padding: [40, 40] });
+                            }
+                        }).catch(err => console.error("Error loading county boundary layer:", err));
+                } else if (currentElectionType === 'county-council') {
+                    // County Council Districts Overlay utilizing consolidated raw GitHub GeoJSON
+                    fetch(countyCouncilDistrictsUrl)
+                        .then(res => res.json())
+                        .then(districtData => {
+                            if (currentYear !== 2023 || currentElectionType !== 'county-council') return;
+
+                            countyCouncilLayer = L.geoJSON(districtData, {
+                                style: overlayStyle,
+                                filter: (feature) => {
+                                    const d = feature.properties.district || feature.properties.District || feature.properties.DISTRICT;
+                                    return [5, 10, 13].includes(parseInt(d, 10));
+                                },
+                                onEachFeature: (feature, layer) => {
+                                    layer.on({
+                                        mouseover: (e) => { e.target.setStyle({ fillOpacity: 0.35, weight: 4, color: "#1d4ed8" }); },
+                                        mouseout: (e) => { if (countyCouncilLayer) countyCouncilLayer.resetStyle(e.target); },
+                                        click: (e) => {
+                                            map.fitBounds(e.target.getBounds());
+                                            const d = feature.properties.district || feature.properties.District || feature.properties.DISTRICT;
+                                            const distId = parseInt(d, 10);
+                                            
+                                            let candidateText = `Candidate: District ${distId}`;
+                                            let link = "";
+                                            let endorsementText = "";
+
+                                            if (distId === 5) {
+                                                endorsementText = `<small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br>`;
+                                                candidateText = `<strong>Oren Spiegler</strong>`;
+                                                link = "https://www.example.com/questionnaire/county-council-d5";
+                                            } else if (distId === 10) {
+                                                candidateText = `<strong>Dewitt Walton</strong>`;
+                                                link = "https://www.example.com/questionnaire/county-council-d10";
+                                            } else if (distId === 13) {
+                                                candidateText = `<strong>Michelle Naccarati-Chapkis</strong>`;
+                                                link = "https://www.example.com/questionnaire/county-council-d13";
+                                            }
+
+                                            layer.bindPopup(`<b>County Council District ${distId}</b><ul><li>${candidateText}<br>${endorsementText}<small><a href="${link}" target="_blank">View Candidate Questionnaire</a></small></li></ul>`).openPopup();
+                                        }
+                                    });
+                                }
+                            }).addTo(map);
+
+                            if (countyCouncilLayer) {
+                                map.fitBounds(countyCouncilLayer.getBounds(), { padding: [40, 40] });
+                            }
+                        }).catch(err => console.error("Error loading county council layers:", err));
+                }
+
+            } else if (currentYear === 2026 && currentElectionType === 'specials') {
+                fetch(paHouseDistrictsUrl)
+                    .then(res => {
+                        if (!res.ok) throw new Error("HTTP error " + res.status);
+                        return res.json();
+                    })
+                    .then(houseDistricts => {
+                        if (currentYear !== 2026 || currentElectionType !== 'specials') return;
+
+                        specialHouseDistrictsLayer = L.geoJSON(houseDistricts, {
+                            style: (feature) => {
+                                const districtNumber = parseInt(feature.properties.LEG_DISTRI, 10);
+                                if (districtNumber === 12) return { color: "#1e4ed8", weight: 3, fillColor: "#3b82f6", fillOpacity: 0.2 };
+                                if (districtNumber === 42) return { color: "#1e4ed8", weight: 3, fillColor: "#3b82f6", fillOpacity: 0.2 };
+                                return { fillOpacity: 0, stroke: false, interactive: false };
+                            },
+                            filter: (feature) => [12, 42].includes(parseInt(feature.properties.LEG_DISTRI, 10)),
+                            onEachFeature: (feature, layer) => {
+                                layer.on({
+                                    mouseover: (e) => { e.target.setStyle({ fillOpacity: 0.6, weight: 4 }); },
+                                    mouseout: (e) => { if (specialHouseDistrictsLayer) specialHouseDistrictsLayer.resetStyle(e.target); },
+                                    click: (e) => {
+                                        map.fitBounds(e.target.getBounds());
+                                        const distNumber = parseInt(feature.properties.LEG_DISTRI, 10);
+                                        
+                                        let popupContent = `<b>PA House District ${distNumber}</b>`;
+                                        
+                                        if (distNumber === 12) {
+                                            popupContent += `
+                                            <ul>
+                                                <li>
+                                                    <strong>Brandon Dukes</strong><br>
+                                                    <small><a href="https://www.example.com/questionnaire/brandon-dukes" target="_blank">View Candidate Questionnaire</a></small><br>
+                                                    <strong>Scott Timko</strong><br>
+                                                    <small><a href="https://www.example.com/questionnaire/scott-timko" target="_blank">View Candidate Questionnaire</a></small>
+                                                </li>
+                                            </ul>`;
+                                        } else if (distNumber === 42) {
+                                            popupContent += `
+                                            <ul>
+                                                <li>
+                                                    <strong>Jen Mazzocco</strong><br>
+                                                    <small style="color:#059669;">Pro-Housing Pittsburgh Endorsed</small><br>
+                                                    <small><a href="https://www.prohousingpgh.org/blog/february-24-special-questionnaire-responses" target="_blank">View Candidate Questionnaire</a></small>
+                                                </li>
+                                            </ul>`;
+                                        }
+
+                                        layer.bindPopup(popupContent).openPopup();
+                                    }
+                                });
+                            }
+                        }).addTo(map);
+                        
+                        if (specialHouseDistrictsLayer && specialHouseDistrictsLayer.getLayers().length > 0) {
+                            map.fitBounds(specialHouseDistrictsLayer.getBounds(), { padding: [60, 60] });
+                        }
+                    }).catch(err => console.error("Could not parse local GeoJSON shapes:", err));
+            }
+        }
+    </script>
+</body>
+</html>
